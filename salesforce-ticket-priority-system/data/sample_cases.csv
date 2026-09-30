@@ -1,0 +1,21 @@
+id,subject,description,account_tier,expected_priority
+1,"Production outage — system down","All users unable to access dashboard, production down since 9am",Platinum,Critical
+2,"Security breach suspected","Possible data breach on login service, investigate urgently",Platinum,Critical
+3,"Data loss after migration","Customer reports data loss in production org after weekend migration",Gold,High
+4,"SLA breach — outage continues","Outage ongoing for 6 hours, SLA breach imminent, need escalation",Gold,Critical
+5,"Urgent: payment failures","Multiple customers report payment failed at checkout, blocked",Gold,Critical
+6,"Critical escalation needed","Account unable to work, cannot access billing portal, escalate",Silver,Critical
+7,"Cannot access VPN","Remote team blocked, cannot access internal tools since morning",Silver,High
+8,"Payment refund stuck","Refund failing for 3 invoices, urgent fix needed",Bronze,Medium
+9,"Dashboard slow and buggy","Reports show delay and occasional error on load",Silver,Medium
+10,"API integration error","Integration failing with error 500, broken sync",Bronze,Medium
+11,"Email notifications delayed","Issue with delayed alerts, bug in queue worker",Bronze,Medium
+12,"Broken export to CSV","Export broken, error when file exceeds 10k rows",Bronze,Medium
+13,"How to export reports?","Question on documentation, how to schedule exports?",Bronze,Low
+14,"Feature request: dark mode","Suggestion for dark mode and training material",Silver,Low
+15,"Training question","How to onboard new agents? Documentation request",Bronze,Low
+16,"Billing question on invoice","Question about invoice copy, no urgency",Gold,Low
+17,"Urgent outage? No — how to question","Just a question on how to reset password, not urgent",Bronze,Medium
+18,"Slow login since update","Login slow with delay after release, error sometimes",Gold,Medium
+19,"Production down for platinum client","System down, outage confirmed, security team paged",Platinum,Critical
+20,"Password reset help","Cannot login, need how-to reset steps",Bronze,Low
