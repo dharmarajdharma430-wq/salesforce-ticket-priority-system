@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ticket Priority Prediction — Browser Demo</title>
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; margin: 20px; background: #f4f6f9; color: #222; }
+  h1 { margin-bottom: 4px; } p.sub { color: #555; margin-top: 0; }
+  .card { background: #fff; border-radius: 8px; padding: 16px; margin: 12px 0; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; }
+  th { background: #eef2f7; }
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-weight: 600; font-size: 12px; }
+  .Critical { background: #fee2e2; color: #b91c1c; } .High { background: #ffedd5; color: #c2410c; }
+  .Medium { background: #fef9c3; color: #854d0e; } .Low { background: #dcfce7; color: #166534; }
+  .ok { color: #166534; font-weight: bold; } .miss { color: #b91c1c; font-weight: bold; }
+  label { display: block; margin: 8px 0 4px; font-weight: 600; }
+  input, textarea, select { width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 6px; }
+  button { margin-top: 10px; padding: 10px 18px; border: 0; border-radius: 6px; background: #0176d3; color: #fff; font-size: 15px; cursor: pointer; }
+  button:hover { background: #014f9c; }
+  #result { font-size: 15px; }
+  .filters button { background: #e5e7eb; color: #111; margin-right: 6px; padding: 6px 12px; font-size: 13px; }
+  .filters button.active { background: #0176d3; color: #fff; }
+</style>
+</head>
+<body>
+<h1>Ticket Priority Prediction + Auto-Assignment</h1>
+<p class="sub">Browser demo — same rule-based logic as <code>TicketPriorityPredictor.cls</code>. No Salesforce org needed.</p>
+
+<div class="card">
+  <h2>Try your own ticket</h2>
+  <label>Subject</label>
+  <input id="subject" value="Production outage — system down">
+  <label>Description</label>
+  <textarea id="description" rows="3">All users unable to access dashboard since 9am</textarea>
+  <label>Account tier</label>
+  <select id="tier"><option>Platinum</option><option>Gold</option><option selected>Silver</option><option>Bronze</option></select>
+  <button onclick="predictCustom()">Predict priority</button>
+  <div id="result" style="margin-top:12px"></div>
+</div>
+
+<div class="card">
+  <h2>Sample tickets (<span id="acc"></span>)</h2>
+  <div class="filters">
+    <button class="active" onclick="filterTable('All',this)">All</button>
+    <button onclick="filterTable('Critical',this)">Critical</button>
+    <button onclick="filterTable('High',this)">High</button>
+    <button onclick="filterTable('Medium',this)">Medium</button>
+    <button onclick="filterTable('Low',this)">Low</button>
+  </div>
+  <table id="tbl"><thead><tr>
+    <th>ID</th><th>Subject</th><th>Tier</th><th>Predicted</th><th>Expected</th><th>Score</th><th>Queue</th><th>Team</th><th>Match</th>
+  </tr></thead><tbody></tbody></table>
+</div>
+
+<script>
+// ---- Mirror of TicketPriorityPredictor.cls + TicketAssignmentService.cls ----
+const CRIT = ["outage","down","data loss","breach","security","production down","sla breach","system down"];
+const HIGH = ["urgent","critical","escalat","unable to work","payment fail","cannot access","blocked"];
+const MED  = ["slow","error","issue","delay","bug","broken","failing"];
+const LOWK = ["question","how to","feature request","documentation","training","suggestion"];
+
+function predict(subject, description, tier) {
+  const text = ((subject||"")+" "+(description||"")).toLowerCase();
+  let score = 0, hits = [];
+  CRIT.forEach(k=>{ if(text.includes(k)){score+=30;hits.push("CRIT:"+k);} });
+  HIGH.forEach(k=>{ if(text.includes(k)){score+=15;hits.push("HIGH:"+k);} });
+  MED.forEach(k=>{ if(text.includes(k)){score+=5;hits.push("MED:"+k);} });
+  LOWK.forEach(k=>{ if(text.includes(k)){score-=10;hits.push("LOW:"+k);} });
+  const t=(tier||"").toLowerCase();
+  if(t==="platinum"){score+=20;hits.push("TIER:+20");} else if(t==="gold"){score+=10;hits.push("TIER:+10");} else if(t==="silver"){score+=5;hits.push("TIER:+5");}
+  const p = score>=50?"Critical":score>=30?"High":score>=10?"Medium":"Low";
+  return {priority:p, score, reason:hits.join(", ")||"no match"};
+}
+function assign(priority, subject, description) {
+  const text = ((subject||"")+" "+(description||"")).toLowerCase();
+  let team="General";
+  if(/billing|invoice|refund|payment/.test(text)) team="Billing_Team";
+  else if(/security|breach|login|access/.test(text)) team="Security_Team";
+  else if(/outage|api|integration|error|down/.test(text)) team="Technical_Team";
+  if(priority==="Critical") return {queue:"Critical_Support_Queue",team,sla:1,esc:true};
+  if(priority==="High") return {queue:"Senior_Support_Queue",team,sla:4,esc:false};
+  if(priority==="Medium") return {queue:"General_Support_Queue",team,sla:24,esc:false};
+  return {queue: team!=="General"?team+"_Queue":"Junior_Support_Queue", team, sla:72, esc:false};
+}
+
+const DATA = [
+[1,"Production outage — system down","All users unable to access dashboard, production down since 9am","Platinum","Critical"],
+[2,"Security breach suspected","Possible data breach on login service, investigate urgently","Platinum","Critical"],
+[3,"Data loss after migration","Customer reports data loss in production org after weekend migration","Gold","High"],
+[4,"SLA breach — outage continues","Outage ongoing for 6 hours, SLA breach imminent, need escalation","Gold","Critical"],
+[5,"Urgent: payment failures","Multiple customers report payment failed at checkout, blocked","Gold","Critical"],
+[6,"Critical escalation needed","Account unable to work, cannot access billing portal, escalate","Silver","Critical"],
+[7,"Cannot access VPN","Remote team blocked, cannot access internal tools since morning","Silver","High"],
+[8,"Payment refund stuck","Refund failing for 3 invoices, urgent fix needed","Bronze","Medium"],
+[9,"Dashboard slow and buggy","Reports show delay and occasional error on load","Silver","Medium"],
+[10,"API integration error","Integration failing with error 500, broken sync","Bronze","Medium"],
+[11,"Email notifications delayed","Issue with delayed alerts, bug in queue worker","Bronze","Medium"],
+[12,"Broken export to CSV","Export broken, error when file exceeds 10k rows","Bronze","Medium"],
+[13,"How to export reports?","Question on documentation, how to schedule exports?","Bronze","Low"],
+[14,"Feature request: dark mode","Suggestion for dark mode and training material","Silver","Low"],
+[15,"Training question","How to onboard new agents? Documentation request","Bronze","Low"],
+[16,"Billing question on invoice","Question about invoice copy, no urgency","Gold","Low"],
+[17,"Urgent outage? No — how to question","Just a question on how to reset password, not urgent","Bronze","Medium"],
+[18,"Slow login since update","Login slow with delay after release, error sometimes","Gold","Medium"],
+[19,"Production down for platinum client","System down, outage confirmed, security team paged","Platinum","Critical"],
+[20,"Password reset help","Cannot login, need how-to reset steps","Bronze","Low"],
+];
+
+let currentFilter="All";
+function render() {
+  const tb=document.querySelector("#tbl tbody"); tb.innerHTML="";
+  let correct=0;
+  DATA.forEach(r=>{
+    const [id,subj,desc,tier,exp]=r;
+    const pr=predict(subj,desc,tier), a=assign(pr.priority,subj,desc);
+    if(pr.priority===exp) correct++;
+    if(currentFilter!=="All"&&pr.priority!==currentFilter) return;
+    const ok=pr.priority===exp;
+    tb.innerHTML+=`<tr><td>${id}</td><td>${subj}</td><td>${tier}</td>
+      <td><span class="badge ${pr.priority}">${pr.priority}</span></td><td>${exp}</td><td>${pr.score}</td>
+      <td>${a.queue}<br><small>SLA ${a.sla}h${a.esc?" • ESCALATED":""}</small></td><td>${a.team}</td>
+      <td class="${ok?"ok":"miss"}">${ok?"OK":"MISS"}</td></tr>`;
+  });
+  document.getElementById("acc").textContent=`Accuracy ${correct}/${DATA.length} = ${Math.round(correct/DATA.length*100)}%`;
+}
+function filterTable(f,btn){
+  currentFilter=f;
+  document.querySelectorAll(".filters button").forEach(b=>b.classList.remove("active"));
+  btn.classList.add("active"); render();
+}
+function predictCustom(){
+  const s=document.getElementById("subject").value,
+        d=document.getElementById("description").value,
+        t=document.getElementById("tier").value;
+  const pr=predict(s,d,t), a=assign(pr.priority,s,d);
+  document.getElementById("result").innerHTML=
+    `Priority: <span class="badge ${pr.priority}">${pr.priority}</span> (score ${pr.score})<br>`+
+    `Queue: <b>${a.queue}</b> • Team: <b>${a.team}</b> • SLA: <b>${a.sla}h</b>${a.esc?" • <b>ESCALATED</b>":""}<br>`+
+    `<small style="color:#555">${pr.reason}</small>`;
+}
+render();
+</script>
+</body>
+</html>
